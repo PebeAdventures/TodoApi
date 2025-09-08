@@ -1,4 +1,5 @@
-﻿using TodoApi.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using TodoApi.Data;
 using TodoApi.Interfaces;
 using TodoApi.Models;
 
@@ -8,47 +9,67 @@ public class TodoRepository : ITodoRepository
 {
     private readonly TodoDbContext _context;
 
-    public TodoRepository(TodoDbContext context)
+    public TodoRepository(TodoDbContext context) => _context = context;
+    public async Task<Todo> AddAsync(Todo entity)
     {
-        _context = context;
-    }
-    public  Task<Todo> AddAsync(Todo entity)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<bool> DeleteAsync(int id)
-    {
-        throw new NotImplementedException();
+        _context.Add(entity);
+        await _context.SaveChangesAsync();
+        return entity;
     }
 
-    public Task<IEnumerable<Todo>> GetAllAsync()
+    public async Task<bool> DeleteAsync(int id)
     {
-        throw new NotImplementedException();
+        var existing = await _context.Todos.FindAsync(id);
+        if( existing is null ) return false;
+        _context.Todos.Remove(existing);
+        await _context.SaveChangesAsync();
+        return true;
     }
 
-    public Task<Todo?> GetByIdAsync(int id)
+    public async Task<IEnumerable<Todo>> GetAllAsync()
     {
-        throw new NotImplementedException();
+        return await _context.Todos.AsNoTracking().ToListAsync();
     }
 
-    public Task<IEnumerable<Todo>> GetIncomingAsync(DateTime start, DateTime end)
+    public async Task<Todo?> GetByIdAsync(int id)
     {
-        throw new NotImplementedException();
+        return await _context.Todos
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id);
     }
 
-    public Task<Todo?> MarkDoneAsync(int id)
+    public async Task<IEnumerable<Todo>> GetIncomingAsync(DateTime start, DateTime end)
     {
-        throw new NotImplementedException();
+        return await _context.Todos.AsNoTracking()
+            .Where(t => t.DueAt >= start && t.DueAt <= end)
+            .ToListAsync();
     }
 
-    public Task<Todo?> SetPercentCompleteAsync(int id, int percentComplete)
+    public async Task<Todo?> MarkDoneAsync(int id)
     {
-        throw new NotImplementedException();
+        var entity = await _context.Todos.FindAsync(id);
+        if (entity is null) return null;
+        entity.IsDone = true;
+        entity.PercentComplete = 100;
+        await _context.SaveChangesAsync();
+        return entity;
     }
 
-    public Task<Todo?> UpdateAsync(Todo entity)
+    public async Task<Todo?> SetPercentCompleteAsync(int id, int percentComplete)
     {
-        throw new NotImplementedException();
+        var entity = await _context.Todos.FindAsync(id);
+        if (entity is null) return null;
+        entity.PercentComplete = percentComplete;
+        await _context.SaveChangesAsync();
+        return entity;
+    }
+
+    public async Task<Todo?> UpdateAsync(Todo entity)
+    {
+        var existing = await _context.Todos.FindAsync(entity.Id);
+        if (existing is null) return null;
+        _context.Entry(existing).CurrentValues.SetValues(entity);
+        await _context.SaveChangesAsync();
+        return existing;
     }
 }
