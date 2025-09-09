@@ -41,7 +41,7 @@ public class TodoRepository : ITodoRepository
     public async Task<IEnumerable<Todo>> GetIncomingAsync(DateTime start, DateTime end)
     {
         return await _context.Todos.AsNoTracking()
-            .Where(t => t.DueAt >= start && t.DueAt <= end)
+            .Where(t => t.DueAt >= start && t.DueAt < end)
             .ToListAsync();
     }
 

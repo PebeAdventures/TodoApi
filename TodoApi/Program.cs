@@ -1,20 +1,26 @@
 using AutoMapper;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.EntityFrameworkCore;
 using TodoApi.Data;
 using TodoApi.DTOs;
+using TodoApi.Filters;
 using TodoApi.Interfaces;
 using TodoApi.Mapping;
 using TodoApi.Models;
 using TodoApi.Repositories;
 using TodoApi.Services;
 using TodoApi.Validators;
-using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+var isTesting = builder.Environment.IsEnvironment("Testing");
+
 //Connection string
-builder.Services.AddDbContext<TodoDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+if (!isTesting)
+{
+    builder.Services.AddDbContext<TodoDbContext>(opt =>
+        opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+}
 
 //Automapper registration
 builder.Services.AddAutoMapper(typeof(MappingProfile));
@@ -33,9 +39,10 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Apply pending ef Core migrations at startup
-using (var scope = app.Services.CreateScope())
+// Apply pending ef Core migrations at startup if isTesting == false
+if (!app.Environment.IsEnvironment("Testing"))
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<TodoDbContext>();
     db.Database.Migrate();
 }
@@ -70,7 +77,9 @@ app.MapPost("/api/todos", async (TodoCreateDto dto, ITodoService service, IMappe
     var created = await service.CreateAsync(dto);
     var result = mapper.Map<TodoDto>(created);
     return Results.Created($"/api/todos/{result.Id}", result);
-});
+})
+    .AddEndpointFilter<ValidationFilter<TodoCreateDto>>()
+    .WithName("CreateTodo");
 
 // Update (returns updated DTO)
 app.MapPut("/api/todos/{id:int}", async (int id, TodoUpdateDto dto, ITodoService service, IMapper mapper) =>
@@ -78,7 +87,9 @@ app.MapPut("/api/todos/{id:int}", async (int id, TodoUpdateDto dto, ITodoService
     var updated = await service.UpdateAsync(id, dto);
     if (updated is null) return Results.NotFound();
     return Results.Ok(mapper.Map<TodoDto>(updated));
-});
+})
+    .AddEndpointFilter<ValidationFilter<TodoUpdateDto>>()
+    .WithName("UpdateTodo");
 
 // Set percent (returns updated DTO)
 app.MapPatch("/api/todos/{id:int}/percent", async (int id, SetPercentDto dto, ITodoService service, IMapper mapper) =>
@@ -103,4 +114,14 @@ app.MapDelete("/api/todos/{id:int}", async (int id, ITodoService service) =>
     return ok ? Results.NoContent() : Results.NotFound();
 });
 
+// Incoming Todo's
+app.MapGet("/api/todos/incoming", async (IncomingRange range, ITodoService service, IMapper mapper) =>
+{
+    var entities = await service.GetIncomingAsync(range);
+    var dtos = mapper.Map<IEnumerable<TodoDto>>(entities);
+    return Results.Ok(dtos);
+})
+.WithName("GetIncomingTodos");
+
 app.Run();
+public partial class Program { }
