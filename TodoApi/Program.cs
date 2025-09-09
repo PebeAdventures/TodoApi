@@ -28,6 +28,7 @@ builder.Services.AddAutoMapper(typeof(MappingProfile));
 //FluentValidation registration
 builder.Services.AddValidatorsFromAssemblyContaining<TodoCreateDtoValidator>();
 builder.Services.AddValidatorsFromAssemblyContaining<TodoUpdateDtoValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<SetPercentDtoValidator>();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddFluentValidationClientsideAdapters();
 
@@ -61,7 +62,9 @@ app.MapGet("/api/todos", async (ITodoService service, IMapper mapper) =>
     var entities = await service.GetAllAsync();
     var dtos = mapper.Map<IEnumerable<TodoDto>>(entities);
     return Results.Ok(dtos);
-});
+})
+    .WithName("GetAllTodo")
+    .WithOpenApi(op => { op.Summary = "Get all todo's"; return op; }); ;
 
 // Get by id
 app.MapGet("/api/todos/{id:int}", async (int id, ITodoService service, IMapper mapper) =>
@@ -69,7 +72,9 @@ app.MapGet("/api/todos/{id:int}", async (int id, ITodoService service, IMapper m
     var entity = await service.GetByIdAsync(id);
     if (entity is null) return Results.NotFound();
     return Results.Ok(mapper.Map<TodoDto>(entity));
-});
+})
+    .WithName("GetTodoById")
+    .WithOpenApi(op => { op.Summary = "Get todo by ID"; return op; }); ;
 
 // Create
 app.MapPost("/api/todos", async (TodoCreateDto dto, ITodoService service, IMapper mapper) =>
@@ -79,7 +84,8 @@ app.MapPost("/api/todos", async (TodoCreateDto dto, ITodoService service, IMappe
     return Results.Created($"/api/todos/{result.Id}", result);
 })
     .AddEndpointFilter<ValidationFilter<TodoCreateDto>>()
-    .WithName("CreateTodo");
+    .WithName("CreateTodo")
+    .WithOpenApi(op => { op.Summary = "Create a new todo"; return op; }); ;
 
 // Update (returns updated DTO)
 app.MapPut("/api/todos/{id:int}", async (int id, TodoUpdateDto dto, ITodoService service, IMapper mapper) =>
@@ -89,7 +95,8 @@ app.MapPut("/api/todos/{id:int}", async (int id, TodoUpdateDto dto, ITodoService
     return Results.Ok(mapper.Map<TodoDto>(updated));
 })
     .AddEndpointFilter<ValidationFilter<TodoUpdateDto>>()
-    .WithName("UpdateTodo");
+    .WithName("UpdateTodo")
+    .WithOpenApi(op => { op.Summary = "Update an existing todo"; return op; });
 
 // Set percent (returns updated DTO)
 app.MapPatch("/api/todos/{id:int}/percent", async (int id, SetPercentDto dto, ITodoService service, IMapper mapper) =>
@@ -97,7 +104,10 @@ app.MapPatch("/api/todos/{id:int}/percent", async (int id, SetPercentDto dto, IT
     var updated = await service.SetPercentCompleteAsync(id, dto.PercentComplete);
     if (updated is null) return Results.NotFound();
     return Results.Ok(mapper.Map<TodoDto>(updated));
-});
+})
+.AddEndpointFilter<ValidationFilter<SetPercentDto>>()
+.WithName("SetPercentTodo")
+.WithOpenApi(op => { op.Summary = "Set todo percent complete"; return op; });
 
 // Mark done (returns updated DTO)
 app.MapPost("/api/todos/{id:int}/done", async (int id, ITodoService service, IMapper mapper) =>
@@ -105,14 +115,18 @@ app.MapPost("/api/todos/{id:int}/done", async (int id, ITodoService service, IMa
     var updated = await service.MarkDoneAsync(id);
     if (updated is null) return Results.NotFound();
     return Results.Ok(mapper.Map<TodoDto>(updated));
-});
+})
+    .WithName("markTodoDone")
+    .WithOpenApi(op => { op.Summary = "Mark todo as done"; return op; });
 
 // Delete (bool -> 204/404)
 app.MapDelete("/api/todos/{id:int}", async (int id, ITodoService service) =>
 {
     var ok = await service.DeleteAsync(id);
     return ok ? Results.NoContent() : Results.NotFound();
-});
+})
+    .WithName("DeleteTodo")
+    .WithOpenApi(op => { op.Summary = "Delete todo"; return op; });
 
 // Incoming Todo's
 app.MapGet("/api/todos/incoming", async (IncomingRange range, ITodoService service, IMapper mapper) =>
@@ -121,7 +135,13 @@ app.MapGet("/api/todos/incoming", async (IncomingRange range, ITodoService servi
     var dtos = mapper.Map<IEnumerable<TodoDto>>(entities);
     return Results.Ok(dtos);
 })
-.WithName("GetIncomingTodos");
+.WithName("GetIncomingTodos")
+.WithOpenApi(op =>
+{
+    op.Summary = "Get incoming todos";
+    op.Description = "Range: Today, Tomorrow, Week (Mon–Sun, UTC).";
+    return op;
+});
 
 app.Run();
 public partial class Program { }
