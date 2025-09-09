@@ -12,9 +12,9 @@ using TodoApi.Validators;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-//TODO temp conn string
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-                        ?? "Host=localhost;Database=todo;Username=postgres;Password=postgres";
+//Connection string
+builder.Services.AddDbContext<TodoDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 //Automapper registration
 builder.Services.AddAutoMapper(typeof(MappingProfile));
